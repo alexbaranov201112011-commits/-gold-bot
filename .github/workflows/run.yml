@@ -1,24 +1,18 @@
-name: gold-bot 24/7
+name: Run Bot 24/7
 on:
-  workflow_dispatch:
   schedule:
-    - cron: '0 */5 * * *'
-  push:
-    branches: [ main ]
+    - cron: '*/15 * * * *'
+  workflow_dispatch:
 jobs:
   run:
     runs-on: ubuntu-latest
-    timeout-minutes: 350
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      - name: Install
-        run: pip install -r requirements.txt
-      - name: Run bot
-        run: python bot.py
+      - run: pip install yfinance python-telegram-bot
+      - run: python bot.py
         env:
-          BOT_TOKEN: ${{ secrets.TOKEN }}
-          CHAT_ID: ${{ secrets.CHAT_ID }}
           TOKEN: ${{ secrets.TOKEN }}
+          CHAT_ID: ${{ secrets.CHAT_ID }}
