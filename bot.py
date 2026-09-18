@@ -1,14 +1,17 @@
 import os, requests, yfinance as yf
-
-def send(msg):
-    token = os.getenv("TELEGRAM_TOKEN") or os.getenv("TOKEN")
-    chat = os.getenv("TELEGRAM_CHAT_ID") or os.getenv("CHAT_ID")
+def send(text):
+    token=os.getenv("TELEGRAM_TOKEN")
+    chat=os.getenv("TELEGRAM_CHAT_ID")
+    print(f"TOKEN exists: {bool(token)} CHAT exists: {bool(chat)}")
     if not token or not chat:
-        print("SECRETS NOT FOUND")
-        return
-    r = requests.post(f"https://api.telegram.org/bot{token}/sendMessage", data={"chat_id": chat, "text": msg, "parse_mode": "HTML"})
-    print(r.text)
-
-price = yf.Ticker("GC=F").history(period="1d")["Close"].iloc[-1]
-send(f"✅ БОТ ЗАПУЩЕН!\nЗолото: ${price:.2f}\nБудет работать 24/7 каждые 15 мин")
-print(f"Done price {price}")
+        print("SECRETS NOT FOUND!"); return
+    url=f"https://api.telegram.org/bot{token}/sendMessage"
+    r=requests.post(url, json={"chat_id":chat,"text":text})
+    print(f"Telegram answer: {r.text}")
+try:
+    data=yf.download("GC=F", period="2d", interval="1h")
+    price=float(data['Close'].iloc[-1])
+    send(f"✅ БОТ ЗАПУЩЕН! Золото: ${price:.2f}")
+except Exception as e:
+    send(f"Ошибка бота: {e}")
+    print(e)
