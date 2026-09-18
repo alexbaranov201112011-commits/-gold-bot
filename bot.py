@@ -17,19 +17,11 @@ def to_float(x):
         return float(x.iloc[-1])
 
 def check_news():
-    # Проверяем новости по USD с ForexFactory
     try:
-        # Время Актау UTC+5
         now_utc = datetime.utcnow()
         now_aktau = now_utc + timedelta(hours=5)
-
-        # Основные часы новостей США: 16:30, 18:30, 20:00 по Актау
-        news_hours = [16, 18, 19, 20] # часы когда часто новости
-        # Если сейчас новостной час - предупреждаем
-        if now_aktau.hour in news_hours and now_aktau.minute < 40:
-            return f"⚠️ Сейчас новостное время ({now_aktau.hour}:{now_aktau.minute:02d} Актау). Возможна высокая волатильность."
-
-        # Пробуем скачать календарь
+        if now_aktau.hour in [16, 18, 19, 20] and now_aktau.minute < 40:
+            return f"⚠️ Новостное время ({now_aktau.hour}:{now_aktau.minute:02d} Актау) - возможна волатильность"
         url = "https://nfs.faireconomy.media/ff_calendar_thisweek.json"
         r = requests.get(url, timeout=5)
         if r.status_code == 200:
@@ -37,10 +29,7 @@ def check_news():
             today_str = now_utc.strftime("%Y-%m-%d")
             for event in data:
                 if event.get('date') == today_str and 'USD' in event.get('country','') and event.get('impact') == 'High':
-                    event_time = event.get('time','')
-                    title = event.get('title','')
-                    # Если новость в ближайшие 2 часа
-                    return f"🚨 СЕГОДНЯ НОВОСТИ USD: {title} в {event_time} UTC. Осторожно!"
+                    return f"🚨 НОВОСТИ USD: {event.get('title','')} в {event.get('time','')} UTC"
         return None
     except:
         return None
@@ -49,9 +38,12 @@ def get_gold_analysis():
     try:
         news_warning = check_news()
 
-        data = yf.download("GC=F", period="5d", interval="15m", progress=False, auto_adjust=True)
+        # Используем SPOT цену как у тебя в StarTrader
+        data = yf.download("XAUUSD=X", period="5d", interval="15m", progress=False, auto_adjust=True)
         if data.empty:
-            return "Ошибка: нет данных yfinance"
+            data = yf.download("GC=F", period="5d", interval="15m", progress=False, auto_adjust=True)
+        if data.empty:
+            return "❌ Ошибка: нет данных yfinance"
 
         close = data['Close']
         if isinstance(close, pd.DataFrame):
@@ -61,7 +53,10 @@ def get_gold_analysis():
         ema9 = float(close.ewm(span=9).mean().iloc[-1])
         ema21 = float(close.ewm(span=21).mean().iloc[-1])
 
-        daily = yf.download("GC=F", period="20d", interval="1d", progress=False, auto_adjust=True)
+        daily = yf.download("XAUUSD=X", period="20d", interval="1d", progress=False, auto_adjust=True)
+        if daily.empty:
+            daily = yf.download("GC=F", period="20d", interval="1d", progress=False, auto_adjust=True)
+
         d_high = daily['High']
         d_low = daily['Low']
         if isinstance(d_high, pd.DataFrame):
@@ -72,15 +67,15 @@ def get_gold_analysis():
         trend_strength = abs(ema9 - ema21)
         flat_threshold = price * 0.0015
 
-        header = f"🟡 GOLD: ${price:.1f} | ADR: ${adr:.1f}\n"
+        header = f"🟡 GOLD SPOT: ${price:.2f} | ADR: ${adr:.1f}\n"
         if news_warning:
             header += f"\n{news_warning}\n"
 
-        if adr < 35:
+        if adr < 20:
             return header + f"\n⛔ НЕТ СИГНАЛА\nПричина: Волатильность низкая ADR {adr:.1f}"
 
         if trend_strength < flat_threshold:
-            return header + f"EMA9 {ema9:.1f} | EMA21 {ema21:.1f}\n\n⛔ ФЛЕТ, БЕЗ СДЕЛКИ\nТренд слабый {trend_strength:.1f}$ < {flat_threshold:.1f}$"
+            return header + f"EMA9 {ema9:.2f} | EMA21 {ema21:.2f}\n\n⛔ ФЛЕТ, БЕЗ СДЕЛКИ\nТренд слабый {trend_strength:.2f}$ < {flat_threshold:.2f}$"
 
         is_long = ema9 > ema21
         direction = "📈 LONG" if is_long else "📉 SHORT"
@@ -94,9 +89,16 @@ def get_gold_analysis():
             tp1 = price - adr * 0.3
             tp2 = price - adr * 0.6
 
-        # Если есть новости - добавляем предупреждение но сигнал даем
         footer = "\n⚠️ Новости! Уменьши лот x2" if news_warning else ""
-        return header + f"EMA9: {ema9:.1f} | EMA21: {ema21:.1f}\n\n{direction} - СИГНАЛ ✅{footer}\nВход: ~${price:.1f}\nТП1: ${tp1:.1f}\nТП2: ${tp2:.1f}\nСЛ: ${sl:.1f}"
+        return (
+            header +
+            f"EMA9: {ema9:.2f} | EMA21: {ema21:.2f}\n\n"
+            f"{direction} - СИГНАЛ ✅{footer}\n"
+            f"Вход: ~${price:.2f}\n"
+            f"ТП1: ${tp1:.2f}\n"
+            f"ТП2: ${tp2:.2f}\n"
+            f"СЛ: ${sl:.2f}"
+        )
 
     except Exception as e:
         return f"Ошибка: {e}"
@@ -108,7 +110,7 @@ def gold_cmd(message):
 
 @bot.message_handler(commands=['start'])
 def start_cmd(message):
-    bot.reply_to(message, "Бот готов. Жми /gold")
+    bot.reply_to(message, "Бот готов ✅ Жми /gold для анализа XAUUSD")
 
 print("Bot started...")
 bot.infinity_polling(timeout=60, long_polling_timeout=60)
