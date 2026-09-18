@@ -1,17 +1,41 @@
-import os, requests, yfinance as yf
-def send(text):
-    token=os.getenv("TELEGRAM_TOKEN")
-    chat=os.getenv("TELEGRAM_CHAT_ID")
-    print(f"TOKEN exists: {bool(token)} CHAT exists: {bool(chat)}")
-    if not token or not chat:
-        print("SECRETS NOT FOUND!"); return
-    url=f"https://api.telegram.org/bot{token}/sendMessage"
-    r=requests.post(url, json={"chat_id":chat,"text":text})
-    print(f"Telegram answer: {r.text}")
-try:
-    data=yf.download("GC=F", period="2d", interval="1h")
-    price=float(data['Close'].iloc[-1])
-    send(f"✅ БОТ ЗАПУЩЕН! Золото: ${price:.2f}")
-except Exception as e:
-    send(f"Ошибка бота: {e}")
-    print(e)
+import os
+import yfinance as yf
+import requests
+
+TOKEN = os.getenv("TELEGRAM_TOKEN")
+CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
+
+def get_gold_data():
+    try:
+        data = yf.download("GC=F", period="3mo", interval="1d", auto_adjust=True)
+        if data.empty:
+            return None, "Нет данных"
+        
+        close = data['Close']
+        # ИСПРАВЛЕНИЕ ОШИБКИ Series
+        price = float(close.iloc[-1])
+        
+        ema20 = float(close.ewm(span=20).mean().iloc[-1])
+        ema50 = float(close.ewm(span=50).mean().iloc[-1])
+        
+        trend = "📈 ЛОНГ" if ema20 > ema50 else "📉 ШОРТ"
+        
+        text = f"🟡 GOLD: ${price:.2f}\n{trend}\nEMA20: ${ema20:.2f}\nEMA50: ${ema50:.2f}\n\nБот работает 24/7 ✅"
+        return text, None
+    except Exception as e:
+        return None, str(e)
+
+def send(msg):
+    if not TOKEN or not CHAT_ID: return
+    try:
+        url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
+        requests.post(url, data={"chat_id": CHAT_ID, "text": msg})
+    except: pass
+
+msg, err = get_gold_data()
+if err:
+    send(f"Ошибка бота: {err}")
+else:
+    send(msg)
+
+print("Done")
