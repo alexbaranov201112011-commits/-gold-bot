@@ -29,8 +29,6 @@ def check_news():
 def get_gold_analysis():
     try:
         news_warning = check_news()
-
-        # 1. Берем РЕАЛЬНУЮ спот цену с API (как у StarTrader)
         real_spot = None
         try:
             r = requests.get("https://api.gold-api.com/price/XAU", timeout=5).json()
@@ -38,7 +36,6 @@ def get_gold_analysis():
         except:
             pass
 
-        # 2. Берем данные для анализа тренда
         data = yf.download("GC=F", period="5d", interval="15m", progress=False, auto_adjust=True)
         if data.empty:
             return "❌ Нет данных"
@@ -51,8 +48,7 @@ def get_gold_analysis():
         ema9_yahoo = float(close.ewm(span=9).mean().iloc[-1])
         ema21_yahoo = float(close.ewm(span=21).mean().iloc[-1])
 
-        # 3. Синхронизируем с реальной ценой
-        if real_spot and 3000 < real_spot < 6000: # проверка адекватности
+        if real_spot and 3000 < real_spot < 6000:
             diff = real_spot - yahoo_price
             price = real_spot
             ema9 = ema9_yahoo + diff
@@ -73,17 +69,20 @@ def get_gold_analysis():
         adr = float((d_high - d_low).tail(14).mean())
 
         trend_strength = abs(ema9 - ema21)
-        flat_threshold = price * 0.0015
+        flat_threshold = price * 0.003
 
         header = f"🟡 GOLD {source}: ${price:.2f} | ADR: ${adr:.1f}\n"
         if news_warning:
             header += f"\n{news_warning}\n"
 
-        if adr < 20:
-            return header + f"\n⛔ НЕТ СИГНАЛА\nADR {adr:.1f}"
+        if adr < 25:
+            return header + f"\n⛔ НЕТ СИГНАЛА\nADR низкий {adr:.1f}"
 
         if trend_strength < flat_threshold:
-            return header + f"EMA9 {ema9:.2f} | EMA21 {ema21:.2f}\n\n⛔ ФЛЕТ, БЕЗ СДЕЛКИ\nТренд слабый {trend_strength:.2f}$ < {flat_threshold:.2f}$"
+            return header + f"EMA9 {ema9:.2f} | EMA21 {ema21:.2f}\n\n⛔ ФЛЕТ, БЕЗ СДЕЛКИ\nТренд {trend_strength:.2f}$ < {flat_threshold:.2f}$"
+
+        if news_warning:
+            return header + f"EMA9 {ema9:.2f} | EMA21 {ema21:.2f}\n\n⛔ НОВОСТИ - ПРОПУСКАЕМ\n{news_warning}"
 
         is_long = ema9 > ema21
         direction = "📈 LONG" if is_long else "📉 SHORT"
@@ -92,22 +91,23 @@ def get_gold_analysis():
             sl = price - adr * 0.4
             tp1 = price + adr * 0.3
             tp2 = price + adr * 0.6
+            tp3 = price + adr * 0.9
         else:
             sl = price + adr * 0.4
             tp1 = price - adr * 0.3
             tp2 = price - adr * 0.6
+            tp3 = price - adr * 0.9
 
-        footer = "\n⚠️ Новости! Уменьши лот x2" if news_warning else ""
         return (
             header +
             f"EMA9: {ema9:.2f} | EMA21: {ema21:.2f}\n\n"
-            f"{direction} - СИГНАЛ ✅{footer}\n"
+            f"{direction} - СИГНАЛ ✅\n"
             f"Вход: ~${price:.2f}\n"
-            f"ТП1: ${tp1:.2f}\n"
-            f"ТП2: ${tp2:.2f}\n"
+            f"ТП1: ${tp1:.2f} (50%)\n"
+            f"ТП2: ${tp2:.2f} (30%)\n"
+            f"ТП3: ${tp3:.2f} (20%)\n"
             f"СЛ: ${sl:.2f}"
         )
-
     except Exception as e:
         return f"Ошибка: {e}"
 
@@ -120,5 +120,4 @@ def gold_cmd(message):
 def start_cmd(message):
     bot.reply_to(message, "Бот готов ✅ Жми /gold")
 
-print("Bot started...")
-bot.infinity_polling(timeout=60, long_polling_timeout=60)
+bot.infinity_polling()
