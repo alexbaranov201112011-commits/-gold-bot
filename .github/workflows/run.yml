@@ -1,5 +1,8 @@
 name: Run Bot
-on: workflow_dispatch
+on:
+  wname: Run Bot
+on:
+  workflow_dispatch:
 jobs:
   bot:
     runs-on: ubuntu-latest
@@ -9,7 +12,7 @@ jobs:
         with:
           python-version: '3.11'
       - run: pip install requests
-      - env:
+      - run: python bot.py
+        env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-        run: python bot.py
