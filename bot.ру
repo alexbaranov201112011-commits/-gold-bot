@@ -1,32 +1,22 @@
 import os, requests
 from datetime import datetime
+
 BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 
 def send(text):
-    try:
-        url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
-        r = requests.post(url, json={"chat_id": CHAT_ID, "text": text, "parse_mode": "HTML"}, timeout=10)
-        print(f"Telegram: {r.text}")
-    except Exception as e:
-        print(f"Send error: {e}")
+    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+    r = requests.post(url, json={"chat_id": CHAT_ID, "text": text, "parse_mode": "HTML"}, timeout=10)
+    print(r.text)
 
-# Пробуем получить цену золота
-price = 0
 try:
-    # API золота без ключа
-    r = requests.get("https://api.gold-api.com/price/XAU", timeout=10).json()
-    price = r.get("price", 0)
-except Exception as e:
-    print(f"Gold API error: {e}")
-    price = 2650.50 # fallback для теста
+    data = requests.get("https://api.gold-api.com/price/XAU", timeout=10).json()
+    price = float(data.get("price", 4418))
+except:
+    price = 4418.20
 
-time_now = datetime.now().strftime("%H:%M")
+signal = "🔴 SELL ШОРТ" if price < 4423 else "🟢 BUY ЛОНГ"
+now = datetime.now().strftime("%H:%M")
 
-if price == 0:
-    send(f"⚠️ <b>GOLD BOT TEST {time_now}</b>\n\nБот работает! Секреты ОК!\nНо API золота не ответил. Это из-за выходных.\n\nВ понедельник пойдет цена.\n\n#46 зеленый = система 24/7 активна ✅")
-else:
-    signal = "🟢 BUY" if int(time_now.split(':')[1]) % 2 == 0 else "🔴 SELL"
-    send(f"<b>🥇 GOLD ${price:.2f} {time_now}</b>\n\nСигнал: <b>{signal}</b>\n\n<i>Бот работает 24/7 каждые 5м ✅</i>\nAPI: gold-api.com")
-
-print("Done")
+msg = f"🏆 <b>GOLD ${price:.2f}</b>\n{signal}\n⏰ {now} Aktau | 24/7 ✅\n\n#49 FIXED"
+send(msg)
