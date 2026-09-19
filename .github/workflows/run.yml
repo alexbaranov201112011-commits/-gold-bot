@@ -12,8 +12,16 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      - run: pip install requests yfinance
-      - run: python bot.py
+      - name: Show files
+        run: |
+          pwd
+          ls -la
+          find . -name "bot.py" | head -20
+      - name: Install
+        run: pip install requests yfinance
+      - name: Run bot
+        run: |
+          if [ -f bot.py ]; then python bot.py; else find . -name bot.py -exec python {} \;; fi
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
