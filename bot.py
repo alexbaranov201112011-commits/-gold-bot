@@ -12,7 +12,7 @@ def get_price():
     except:
         return None
 
-def send(text):у за
+def send(text):
     if TOKEN and CHAT:
         try:
             requests.get(f"https://api.telegram.org/bot{TOKEN}/sendMessage?chat_id={CHAT}&text={text}", timeout=10)
