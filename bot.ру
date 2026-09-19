@@ -1,6 +1,61 @@
-import os, requests
+import os, requests, yfinance as yf
+import pandas as pd
+from datetime import datetime
+
 BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
-url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
-r = requests.post(url, json={"chat_id": CHAT_ID, "text": "✅ ТЕСТ работает! Секреты подключены!"})
-print(r.text)
+
+def send(text):
+    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+    requests.post(url, json={"chat_id": CHAT_ID, "text": text, "parse_mode": "HTML"})
+
+# Качаем золото GC=F (фьючерс золота)
+data = yf.download("GC=F", period="2d", interval="5m", progress=False)
+if len(data) < 50:
+    send("⚠️ Мало данных по золоту")
+    exit()
+
+close = data['Close']
+# EMA 20 и 50
+ema20 = close.ewm(span=20).mean().iloc[-1]
+ema50 = close.ewm(span=50).mean().iloc[-1]
+price = float(close.iloc[-1])
+# RSI 14
+delta = close.diff()
+gain = delta.where(delta>0,0).ewm(alpha=1/14).mean()
+loss = -delta.where(delta<0,0).ewm(alpha=1/14).mean()
+rs = gain / loss
+rsi = 100 - (100/(1+rs))
+rsi_last = float(rsi.iloc[-1])
+
+time_now = datetime.now().strftime("%H:%M UTC+5")
+
+trend = "🟢 BUY" if ema20 > ema50 else "🔴 SELL"
+if rsi_last > 70:
+    strength = "Перекуплен ⚠️"
+elif rsi_last < 30:
+    strength = "Перепродан ⚠️"
+else:
+    strength = "Норм"
+
+msg = f"""<b>🥇 GOLD XAU/USD {time_now}</b>
+
+Цена: <b>${price:.2f}</b>
+EMA20: ${float(ema20):.2f}
+EMA50: ${float(ema50):.2f}
+RSI: {rsi_last:.1f} - {strength}
+
+Сигнал: <b>{trend}</b>
+
+{'📈 Тренд вверх, ищем BUY' if ema20>ema50 else '📉 Тренд вниз, ищем SELL'}
+"""
+
+# Отправляем только если есть тренд + RSI не экстремальный
+if (ema20 > ema50 and rsi_last < 65) or (ema20 < ema50 and rsi_last > 35):
+    send(msg)
+    print("Sent signal")
+else:
+    # Все равно шлем для теста каждые 30 мин, а то скучно
+    # Уберем потом если хочешь только сигналы
+    send(msg + "\n<i>Мониторинг 24/7 каждые 5м</i>")
+    print("Sent monitoring")
