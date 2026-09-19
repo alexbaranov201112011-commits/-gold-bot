@@ -10,6 +10,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          path: mybot
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
@@ -20,7 +22,5 @@ jobs:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
-          echo "--- FILES ---"
-          ls -la
-          echo "--- PYTHON ---"
-          python bot.py
+          ls -la mybot
+          python mybot/bot.py
